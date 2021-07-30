@@ -18,6 +18,7 @@ from core.utils import ZipReader
 class Dataset(torch.utils.data.Dataset):
   def __init__(self, data_args, debug=False, split='train', level=None):
     super(Dataset, self).__init__()
+    # debug = True
     self.split = split
     self.level = level
     self.w, self.h = data_args['w'], data_args['h']
@@ -56,28 +57,36 @@ class Dataset(torch.utils.data.Dataset):
 
   def load_item(self, index):
     # load image
-    img_path = os.path.dirname(self.data[index]) + '.zip'
+    img_path = os.path.dirname(self.data[index]) 
     img_name = os.path.basename(self.data[index])
-    img = ZipReader.imread(img_path, img_name).convert('RGB')
+    img_name = img_name.replace('.png', '.jpg')
+    img_src = os.path.join(img_path, img_name)    
+
+    # print(img_path)
+    # print(img_name)
+    # img = ZipReader.imread(img_path, img_name).convert('RGB')
+    img = Image.open(img_src).convert('RGB')
+
     # load mask 
     if self.mask_type == 'pconv':
       m_index = random.randint(0, len(self.mask)-1) if self.split == 'train' else index
-      mask_path = os.path.dirname(self.mask[m_index]) + '.zip'
+      mask_path = os.path.dirname(self.mask[m_index]) 
       mask_name = os.path.basename(self.mask[m_index])
       mask = ZipReader.imread(mask_path, mask_name).convert('L')
     else:
       m = np.zeros((self.h, self.w)).astype(np.uint8)
       if self.split == 'train':
-        t, l = random.randint(0, self.h//2), random.randint(0, self.w//2)
-        m[t:t+self.h//2, l:l+self.w//2] = 255
+        t, l = random.randint(0, self.h//8), random.randint(0, self.w//8)
+        m[t:t+self.h//8, l:l+self.w//8] = 255
       else:
-        m[self.h//4:self.h*3//4, self.w//4:self.w*3//4] = 255
+        m[self.h//8:self.h*3//8, self.w//8:self.w*3//8] = 255
+
       mask = Image.fromarray(m).convert('L')
     # augment 
     if self.split == 'train': 
-      img = transforms.RandomHorizontalFlip()(img)
+      # img = transforms.RandomHorizontalFlip()(img)
       img = transforms.ColorJitter(0.05, 0.05, 0.05, 0.05)(img)
-      mask = transforms.RandomHorizontalFlip()(mask)
+      # mask = transforms.RandomHorizontalFlip()(mask)
       mask = mask.rotate(random.randint(0,45), expand=True)
       mask = mask.filter(ImageFilter.MaxFilter(3))
     img = img.resize((self.w, self.h))
